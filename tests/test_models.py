@@ -1,6 +1,6 @@
 """Tests for cert_manager.models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def test_certificate_info_creation():
@@ -10,7 +10,7 @@ def test_certificate_info_creation():
         name="my-cert",
         vault_url="https://myvault.vault.azure.net",
         domains=["example.com", "www.example.com"],
-        expires_on=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        expires_on=datetime(2026, 3, 1, tzinfo=UTC),
         tags={"acme-managed": "true"},
     )
     assert cert.name == "my-cert"
@@ -25,7 +25,7 @@ def test_certificate_info_to_dict_roundtrip():
         name="my-cert",
         vault_url="https://myvault.vault.azure.net",
         domains=["example.com"],
-        expires_on=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        expires_on=datetime(2026, 3, 1, tzinfo=UTC),
         tags={},
     )
     d = cert.to_dict()
