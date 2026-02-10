@@ -1,9 +1,13 @@
 """Azure Functions entry point — triggers and activity function definitions."""
 
 import logging
+from base64 import b64decode
 
 import azure.durable_functions as df
 import azure.functions as func
+
+from cert_manager.config import load_config
+from cert_manager.keyvault import scan_certificates, upload_certificate
 
 app = df.DFApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -22,3 +26,18 @@ async def timer_start(timer: func.TimerRequest, client: df.DurableOrchestrationC
 def certificate_renewal_orchestrator(context: df.DurableOrchestrationContext):
     # Will be implemented in Stage 5
     return []
+
+
+# Activity — scan Key Vault for certificates due for renewal
+@app.activity_trigger(input_name="input")
+def scan_keyvault_certificates(input: None) -> list[dict]:
+    config = load_config()
+    certs = scan_certificates(config)
+    return [c.to_dict() for c in certs]
+
+
+# Activity — upload renewed PFX to Key Vault
+@app.activity_trigger(input_name="input")
+def upload_certificate_to_keyvault(input: dict) -> None:
+    config = load_config()
+    upload_certificate(config, input["cert_name"], b64decode(input["pfx_b64"]))
