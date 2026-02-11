@@ -420,6 +420,71 @@ def test_build_pfx_raises_on_empty_cert_list(_mock_load):
         build_pfx(b"fake-pem", key_pem)
 
 
+# --- _fetch_order tests ---
+
+
+def test_fetch_order_reconstructs_order_resource():
+    """_fetch_order should POST-as-GET the order URL and each authorization."""
+    from acme import messages
+
+    from cert_manager.acme_client import _fetch_order
+
+    mock_client = MagicMock()
+
+    # Mock order body response
+    auth_url_1 = "https://acme.example.com/authz/1"
+    auth_url_2 = "https://acme.example.com/authz/2"
+    order_json = {
+        "status": "pending",
+        "identifiers": [
+            {"type": "dns", "value": "example.com"},
+            {"type": "dns", "value": "www.example.com"},
+        ],
+        "authorizations": [auth_url_1, auth_url_2],
+        "finalize": "https://acme.example.com/finalize/1",
+    }
+    order_response = MagicMock()
+    order_response.json.return_value = order_json
+
+    # Mock authorization responses
+    authz_json_1 = {
+        "status": "pending",
+        "identifier": {"type": "dns", "value": "example.com"},
+        "challenges": [],
+    }
+    authz_json_2 = {
+        "status": "pending",
+        "identifier": {"type": "dns", "value": "www.example.com"},
+        "challenges": [],
+    }
+    authz_response_1 = MagicMock()
+    authz_response_1.json.return_value = authz_json_1
+    authz_response_2 = MagicMock()
+    authz_response_2.json.return_value = authz_json_2
+
+    # net.post returns order first, then each authz
+    mock_client.net.post.side_effect = [order_response, authz_response_1, authz_response_2]
+
+    order_url = "https://acme.example.com/order/1"
+    csr_pem = b"fake-csr"
+
+    result = _fetch_order(mock_client, order_url, csr_pem)
+
+    # Verify POST-as-GET calls (None payload = POST-as-GET per RFC 8555)
+    assert mock_client.net.post.call_count == 3
+    mock_client.net.post.assert_any_call(order_url, None)
+    mock_client.net.post.assert_any_call(auth_url_1, None)
+    mock_client.net.post.assert_any_call(auth_url_2, None)
+
+    # Verify result structure
+    assert isinstance(result, messages.OrderResource)
+    assert result.uri == order_url
+    assert result.csr_pem == csr_pem
+    assert len(result.authorizations) == 2
+    assert result.authorizations[0].uri == auth_url_1
+    assert result.authorizations[1].uri == auth_url_2
+
+
 @patch("cert_manager.acme_client._build_client")
 @patch("cert_manager.acme_client._deserialize_key")
 def test_complete_order_answers_challenges_and_returns_pfx(mock_deser_key, mock_build_client):
