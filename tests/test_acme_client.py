@@ -487,6 +487,46 @@ def test_complete_order_deadline_set_before_challenges(mock_deser_key, mock_buil
     ), f"Deadline {actual_deadline} not within expected range [{expected_min}, {expected_max}]"
 
 
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client._deserialize_key")
+def test_complete_order_raises_when_no_dns01_challenge(mock_deser_key, mock_build_client):
+    """complete_order should raise ValueError when refetched auth has no DNS-01."""
+    import pytest
+
+    from cert_manager.acme_client import complete_order
+
+    mock_key = MagicMock(spec=josepy.JWKRSA)
+    mock_deser_key.return_value = mock_key
+    mock_client = MagicMock()
+    mock_build_client.return_value = mock_client
+
+    # Authorization with only HTTP-01, no DNS-01
+    http_chall = MagicMock()
+    http_chall.chall = MagicMock(spec=challenges.HTTP01)
+    authz = MagicMock()
+    authz.body.identifier.value = "example.com"
+    authz.body.challenges = (http_chall,)
+
+    mock_order = MagicMock()
+    mock_order.authorizations = [authz]
+
+    _, key_pem = _make_self_signed_cert_and_key()
+
+    with patch("cert_manager.acme_client._fetch_order", return_value=mock_order):
+        ctx = AcmeOrderContext(
+            account_key_json='{"kty": "RSA"}',
+            account_uri="https://acme.example.com/acct/123",
+            directory_url="https://acme.example.com/directory",
+            order_url="https://acme.example.com/order/456",
+            csr_pem="fake-csr",
+            private_key_pem=key_pem.decode(),
+            challenges=(),
+        )
+
+        with pytest.raises(ValueError, match="No DNS-01 challenge"):
+            complete_order(ctx)
+
+
 # --- Activity function tests ---
 
 
