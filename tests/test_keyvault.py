@@ -306,3 +306,42 @@ def test_upload_certificate_calls_import(mock_cred, mock_client_cls):
     upload_certificate(config, "my-cert", pfx_data)
 
     mock_client.import_certificate.assert_called_once_with(certificate_name="my-cert", certificate_bytes=pfx_data)
+
+
+# --- _extract_cn tests ---
+
+
+def test_extract_cn_returns_cn_value():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn("CN=example.com") == "example.com"
+
+
+def test_extract_cn_with_other_attributes():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn("CN=example.com, O=Example Inc, C=US") == "example.com"
+
+
+def test_extract_cn_returns_none_for_none():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn(None) is None
+
+
+def test_extract_cn_returns_none_for_empty_string():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn("") is None
+
+
+def test_extract_cn_returns_none_when_no_cn():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn("O=Example Inc, C=US") is None
+
+
+def test_extract_cn_strips_whitespace():
+    from cert_manager.keyvault import _extract_cn
+
+    assert _extract_cn("CN= example.com ") == "example.com"
