@@ -211,6 +211,9 @@ def complete_order(order_context: AcmeOrderContext, deadline_seconds: int = 180)
     csr_pem = order_context.csr_pem.encode() if isinstance(order_context.csr_pem, str) else order_context.csr_pem
     order = _fetch_order(client, order_context.order_url, csr_pem)
 
+    # Calculate deadline before answering challenges so the full window is available for polling
+    deadline = datetime.now(UTC) + timedelta(seconds=deadline_seconds)
+
     # Answer all DNS-01 challenges
     for authz in order.authorizations:
         domain = authz.body.identifier.value
@@ -224,7 +227,6 @@ def complete_order(order_context: AcmeOrderContext, deadline_seconds: int = 180)
             raise ValueError(f"No DNS-01 challenge found for domain {domain}")
 
     # Poll for authorization + finalize
-    deadline = datetime.now(UTC) + timedelta(seconds=deadline_seconds)
     finalized = client.poll_and_finalize(order, deadline)
     logger.info("Order finalized: %s", order.uri)
 

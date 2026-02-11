@@ -390,6 +390,59 @@ def test_complete_order_answers_challenges_and_returns_pfx(mock_deser_key, mock_
     mock_client.poll_and_finalize.assert_called_once()
 
 
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client._deserialize_key")
+def test_complete_order_deadline_set_before_challenges(mock_deser_key, mock_build_client):
+    """Deadline for poll_and_finalize should be calculated before answering challenges."""
+    import datetime as dt
+
+    from cert_manager.acme_client import complete_order
+
+    mock_key = MagicMock(spec=josepy.JWKRSA)
+    mock_deser_key.return_value = mock_key
+
+    mock_client = MagicMock()
+    mock_build_client.return_value = mock_client
+
+    dns_chall = MagicMock()
+    dns_chall.chall = MagicMock(spec=challenges.DNS01)
+    response = MagicMock()
+    dns_chall.response_and_validation.return_value = (response, "token")
+
+    authz = MagicMock()
+    authz.body.challenges = (dns_chall,)
+
+    mock_order = MagicMock()
+    mock_order.authorizations = [authz]
+
+    cert_pem, key_pem = _make_self_signed_cert_and_key()
+    finalized_order = MagicMock()
+    finalized_order.fullchain_pem = cert_pem.decode()
+    mock_client.poll_and_finalize.return_value = finalized_order
+
+    before = dt.datetime.now(dt.UTC)
+
+    with patch("cert_manager.acme_client._fetch_order", return_value=mock_order):
+        ctx = AcmeOrderContext(
+            account_key_json='{"kty": "RSA"}',
+            account_uri="https://acme.example.com/acct/123",
+            directory_url="https://acme.example.com/directory",
+            order_url="https://acme.example.com/order/456",
+            csr_pem="fake-csr",
+            private_key_pem=key_pem.decode(),
+            challenges=(),
+        )
+        complete_order(ctx, deadline_seconds=180)
+
+    # The deadline passed to poll_and_finalize should be ~180s from `before`
+    actual_deadline = mock_client.poll_and_finalize.call_args[0][1]
+    expected_min = before + dt.timedelta(seconds=179)
+    expected_max = before + dt.timedelta(seconds=182)
+    assert (
+        expected_min <= actual_deadline <= expected_max
+    ), f"Deadline {actual_deadline} not within expected range [{expected_min}, {expected_max}]"
+
+
 # --- Activity function tests ---
 
 
