@@ -87,3 +87,27 @@ def test_load_config_invalid_renewal_window(monkeypatch):
 
     with pytest.raises(ValueError, match="RENEWAL_WINDOW_DAYS"):
         load_config()
+
+
+def test_load_config_zero_renewal_window(monkeypatch):
+    from cert_manager.config import load_config
+
+    monkeypatch.setenv("AZURE_KEYVAULT_URL", "https://myvault.vault.azure.net")
+    monkeypatch.setenv("DNS_PROVIDER", "azure")
+    monkeypatch.setenv("ACME_CONTACT_EMAIL", "admin@example.com")
+    monkeypatch.setenv("RENEWAL_WINDOW_DAYS", "0")
+
+    with pytest.raises(ValueError, match="RENEWAL_WINDOW_DAYS must be a positive integer"):
+        load_config()
+
+
+def test_load_config_negative_renewal_window(monkeypatch):
+    from cert_manager.config import load_config
+
+    monkeypatch.setenv("AZURE_KEYVAULT_URL", "https://myvault.vault.azure.net")
+    monkeypatch.setenv("DNS_PROVIDER", "azure")
+    monkeypatch.setenv("ACME_CONTACT_EMAIL", "admin@example.com")
+    monkeypatch.setenv("RENEWAL_WINDOW_DAYS", "-5")
+
+    with pytest.raises(ValueError, match="RENEWAL_WINDOW_DAYS must be a positive integer"):
+        load_config()

@@ -40,6 +40,8 @@ def load_config() -> AppConfig:
         renewal_window_days = int(raw_window)
     except ValueError:
         raise ValueError(f"RENEWAL_WINDOW_DAYS must be an integer, got: {raw_window!r}")
+    if renewal_window_days < 1:
+        raise ValueError(f"RENEWAL_WINDOW_DAYS must be a positive integer, got: {renewal_window_days}")
 
     cloudflare_api_token = os.environ.get("CLOUDFLARE_API_TOKEN")
 
