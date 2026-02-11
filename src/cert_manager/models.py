@@ -91,3 +91,63 @@ class RenewalResult:
             success=data["success"],
             error=data.get("error"),
         )
+
+
+@dataclass(frozen=True)
+class DnsChallengeInfo:
+    """DNS-01 challenge details for a single domain."""
+
+    domain: str
+    record_name: str
+    record_value: str
+
+    def to_dict(self) -> dict:
+        return {
+            "domain": self.domain,
+            "record_name": self.record_name,
+            "record_value": self.record_value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> DnsChallengeInfo:
+        return cls(
+            domain=data["domain"],
+            record_name=data["record_name"],
+            record_value=data["record_value"],
+        )
+
+
+@dataclass(frozen=True)
+class AcmeOrderContext:
+    """Serializable state passed between create_acme_order and finalize_acme_order activities."""
+
+    account_key_json: str
+    account_uri: str
+    directory_url: str
+    order_url: str
+    csr_pem: str
+    private_key_pem: str
+    challenges: tuple[DnsChallengeInfo, ...] = ()
+
+    def to_dict(self) -> dict:
+        return {
+            "account_key_json": self.account_key_json,
+            "account_uri": self.account_uri,
+            "directory_url": self.directory_url,
+            "order_url": self.order_url,
+            "csr_pem": self.csr_pem,
+            "private_key_pem": self.private_key_pem,
+            "challenges": [c.to_dict() for c in self.challenges],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> AcmeOrderContext:
+        return cls(
+            account_key_json=data["account_key_json"],
+            account_uri=data["account_uri"],
+            directory_url=data["directory_url"],
+            order_url=data["order_url"],
+            csr_pem=data["csr_pem"],
+            private_key_pem=data["private_key_pem"],
+            challenges=tuple(DnsChallengeInfo.from_dict(c) for c in data.get("challenges", [])),
+        )

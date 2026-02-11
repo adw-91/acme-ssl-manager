@@ -91,3 +91,44 @@ def test_renewal_result_to_dict_roundtrip():
     d = result.to_dict()
     restored = RenewalResult.from_dict(d)
     assert restored == result
+
+
+# --- DnsChallengeInfo tests ---
+
+
+def test_dns_challenge_info_round_trip():
+    from cert_manager.models import DnsChallengeInfo
+
+    info = DnsChallengeInfo(
+        domain="example.com",
+        record_name="_acme-challenge.example.com",
+        record_value="abc123token",
+    )
+    restored = DnsChallengeInfo.from_dict(info.to_dict())
+    assert restored == info
+
+
+# --- AcmeOrderContext tests ---
+
+
+def test_acme_order_context_round_trip():
+    from cert_manager.models import AcmeOrderContext, DnsChallengeInfo
+
+    ctx = AcmeOrderContext(
+        account_key_json='{"n": "abc", "e": "AQAB", "kty": "RSA"}',
+        account_uri="https://acme.example.com/acct/123",
+        directory_url="https://acme.example.com/directory",
+        order_url="https://acme.example.com/order/456",
+        csr_pem="-----BEGIN CERTIFICATE REQUEST-----\nMII...\n-----END CERTIFICATE REQUEST-----\n",
+        private_key_pem="-----BEGIN PRIVATE KEY-----\nMII...\n-----END PRIVATE KEY-----\n",
+        challenges=(
+            DnsChallengeInfo(
+                domain="example.com",
+                record_name="_acme-challenge.example.com",
+                record_value="token123",
+            ),
+        ),
+    )
+    restored = AcmeOrderContext.from_dict(ctx.to_dict())
+    assert restored == ctx
+    assert restored.challenges == ctx.challenges
