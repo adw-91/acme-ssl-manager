@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import josepy
@@ -374,3 +375,80 @@ def test_complete_order_answers_challenges_and_returns_pfx(mock_deser_key, mock_
     assert len(pfx_bytes) > 0
     mock_client.answer_challenge.assert_called_once_with(dns_chall, response)
     mock_client.poll_and_finalize.assert_called_once()
+
+
+# --- Activity function tests ---
+
+
+@patch.dict(os.environ, {}, clear=False)
+@patch("function_app.create_order")
+def test_create_acme_order_activity(mock_create_order):
+    """Activity deserializes RenewalRequest, calls create_order, returns dict."""
+    from function_app import create_acme_order
+
+    # Remove ACME account env vars if present so ephemeral path is taken
+    os.environ.pop("ACME_ACCOUNT_KEY", None)
+    os.environ.pop("ACME_ACCOUNT_URI", None)
+
+    mock_ctx = AcmeOrderContext(
+        account_key_json='{"kty": "RSA"}',
+        account_uri="https://acme.example.com/acct/1",
+        directory_url="https://acme.example.com/directory",
+        order_url="https://acme.example.com/order/1",
+        csr_pem="fake-csr",
+        private_key_pem="fake-key",
+        challenges=(),
+    )
+    mock_create_order.return_value = mock_ctx
+
+    input_dict = {
+        "cert_name": "my-cert",
+        "vault_url": "https://vault.azure.net",
+        "domains": ["example.com"],
+        "dns_provider": "azure",
+        "acme_directory_url": "https://acme.example.com/directory",
+        "contact_email": "admin@example.com",
+    }
+
+    result = create_acme_order(input_dict)
+
+    mock_create_order.assert_called_once_with(
+        directory_url="https://acme.example.com/directory",
+        contact_email="admin@example.com",
+        domains=["example.com"],
+        account_key_json=None,
+        account_uri=None,
+    )
+    assert result["order_url"] == "https://acme.example.com/order/1"
+
+
+@patch("function_app.complete_order")
+def test_finalize_acme_order_activity(mock_complete_order):
+    """Activity calls complete_order and returns base64 PFX."""
+    from function_app import finalize_acme_order
+
+    mock_complete_order.return_value = b"\x00\x01\x02"
+
+    input_dict = {
+        "order_context": {
+            "account_key_json": '{"kty": "RSA"}',
+            "account_uri": "https://acme.example.com/acct/1",
+            "directory_url": "https://acme.example.com/directory",
+            "order_url": "https://acme.example.com/order/1",
+            "csr_pem": "fake-csr",
+            "private_key_pem": "fake-key",
+            "challenges": [],
+        },
+        "cert_name": "my-cert",
+    }
+
+    result = finalize_acme_order(input_dict)
+
+    mock_complete_order.assert_called_once()
+    assert result["cert_name"] == "my-cert"
+    assert "pfx_b64" in result
+
+    # Verify base64 round-trips
+    from base64 import b64decode
+
+    assert b64decode(result["pfx_b64"]) == b"\x00\x01\x02"

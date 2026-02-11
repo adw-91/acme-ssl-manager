@@ -1,13 +1,16 @@
 """Azure Functions entry point — triggers and activity function definitions."""
 
 import logging
-from base64 import b64decode
+import os
+from base64 import b64decode, b64encode
 
 import azure.durable_functions as df
 import azure.functions as func
 
+from cert_manager.acme_client import complete_order, create_order
 from cert_manager.config import load_config
 from cert_manager.keyvault import scan_certificates, upload_certificate
+from cert_manager.models import AcmeOrderContext, RenewalRequest
 
 app = df.DFApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -41,3 +44,28 @@ def scan_keyvault_certificates(input: None) -> list[dict]:
 def upload_certificate_to_keyvault(input: dict) -> None:
     config = load_config()
     upload_certificate(config, input["cert_name"], b64decode(input["pfx_b64"]))
+
+
+# Activity — create ACME order and extract DNS-01 challenges
+@app.activity_trigger(input_name="input")
+def create_acme_order(input: dict) -> dict:
+    request = RenewalRequest.from_dict(input)
+    ctx = create_order(
+        directory_url=request.acme_directory_url,
+        contact_email=request.contact_email,
+        domains=request.domains,
+        account_key_json=os.environ.get("ACME_ACCOUNT_KEY"),
+        account_uri=os.environ.get("ACME_ACCOUNT_URI"),
+    )
+    return ctx.to_dict()
+
+
+# Activity — answer challenges, poll, finalize, return PFX
+@app.activity_trigger(input_name="input")
+def finalize_acme_order(input: dict) -> dict:
+    order_context = AcmeOrderContext.from_dict(input["order_context"])
+    pfx_bytes = complete_order(order_context)
+    return {
+        "cert_name": input["cert_name"],
+        "pfx_b64": b64encode(pfx_bytes).decode(),
+    }
