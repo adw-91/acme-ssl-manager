@@ -148,6 +148,8 @@ def build_pfx(fullchain_pem: bytes | str, private_key_pem: bytes | str) -> bytes
         private_key_pem = private_key_pem.encode()
 
     certs = x509.load_pem_x509_certificates(fullchain_pem)
+    if not certs:
+        raise ValueError("No certificates found in fullchain PEM data")
     private_key = serialization.load_pem_private_key(private_key_pem, password=None)
 
     end_entity = certs[0]

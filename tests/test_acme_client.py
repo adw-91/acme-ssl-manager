@@ -327,6 +327,19 @@ def test_build_pfx_with_chain():
     assert len(chain) == 1
 
 
+@patch("cert_manager.acme_client.x509.load_pem_x509_certificates", return_value=[])
+def test_build_pfx_raises_on_empty_cert_list(_mock_load):
+    """build_pfx should raise ValueError when PEM parses to zero certificates."""
+    import pytest
+
+    from cert_manager.acme_client import build_pfx
+
+    _, key_pem = _make_self_signed_cert_and_key()
+
+    with pytest.raises(ValueError, match="No certificates found"):
+        build_pfx(b"fake-pem", key_pem)
+
+
 @patch("cert_manager.acme_client._build_client")
 @patch("cert_manager.acme_client._deserialize_key")
 def test_complete_order_answers_challenges_and_returns_pfx(mock_deser_key, mock_build_client):
