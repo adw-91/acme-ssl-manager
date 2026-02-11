@@ -230,6 +230,7 @@ def complete_order(order_context: AcmeOrderContext, deadline_seconds: int = 180)
             raise ValueError(f"No DNS-01 challenge found for domain {domain}")
 
     # Poll for authorization + finalize
+    logger.info("Polling for %d authorization(s) — deadline in %d seconds", len(order.authorizations), deadline_seconds)
     finalized = client.poll_and_finalize(order, deadline)
     logger.info("Order finalized: %s", order.uri)
 
