@@ -99,12 +99,8 @@ def test_scan_filters_by_renewal_window(mock_cred, mock_client_cls):
     within_window = datetime.now(UTC) + timedelta(days=10)
     outside_window = datetime.now(UTC) + timedelta(days=60)
 
-    expiring_soon = _make_cert_properties(
-        "expiring-cert", tags={"acme-managed": "true"}, expires_on=within_window
-    )
-    not_yet = _make_cert_properties(
-        "healthy-cert", tags={"acme-managed": "true"}, expires_on=outside_window
-    )
+    expiring_soon = _make_cert_properties("expiring-cert", tags={"acme-managed": "true"}, expires_on=within_window)
+    not_yet = _make_cert_properties("healthy-cert", tags={"acme-managed": "true"}, expires_on=outside_window)
 
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
@@ -229,6 +225,7 @@ def test_scan_includes_cert_with_no_expiry(mock_cred, mock_client_cls, caplog):
 
     assert len(results) == 1
     assert results[0].name == "no-expiry"
+    assert results[0].expires_on == datetime.max.replace(tzinfo=UTC)
     assert "no-expiry" in caplog.text
     assert "no expiry" in caplog.text.lower()
 
@@ -308,6 +305,4 @@ def test_upload_certificate_calls_import(mock_cred, mock_client_cls):
 
     upload_certificate(config, "my-cert", pfx_data)
 
-    mock_client.import_certificate.assert_called_once_with(
-        certificate_name="my-cert", certificate_bytes=pfx_data
-    )
+    mock_client.import_certificate.assert_called_once_with(certificate_name="my-cert", certificate_bytes=pfx_data)

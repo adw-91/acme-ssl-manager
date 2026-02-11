@@ -67,7 +67,7 @@ def scan_certificates(config: AppConfig) -> list[CertificateInfo]:
                 name=props.name,
                 vault_url=props.vault_url,
                 domains=domains,
-                expires_on=props.expires_on or datetime.min.replace(tzinfo=UTC),
+                expires_on=props.expires_on or datetime.max.replace(tzinfo=UTC),
                 tags=dict(props.tags or {}),
             )
         )
