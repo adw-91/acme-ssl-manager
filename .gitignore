@@ -10,4 +10,5 @@ build/
 .pytest_cache/
 local.settings.json
 .python_packages/
+.worktrees/
 nul
