@@ -14,6 +14,16 @@ from cert_manager.models import CertificateInfo
 
 logger = logging.getLogger(__name__)
 
+_credential: DefaultAzureCredential | None = None
+
+
+def _get_credential() -> DefaultAzureCredential:
+    """Return a cached DefaultAzureCredential instance."""
+    global _credential
+    if _credential is None:
+        _credential = DefaultAzureCredential()
+    return _credential
+
 
 def _extract_cn(subject: str | None) -> str | None:
     """Extract CN value from an X.500 subject string like 'CN=example.com'."""
@@ -33,7 +43,7 @@ def scan_certificates(config: AppConfig) -> list[CertificateInfo]:
     A new CertificateClient is created per call because Durable Functions
     activities may run in separate processes — client sharing is not possible.
     """
-    client = CertificateClient(config.keyvault_url, DefaultAzureCredential())
+    client = CertificateClient(config.keyvault_url, _get_credential())
     cutoff = datetime.now(UTC) + timedelta(days=config.renewal_window_days)
     results: list[CertificateInfo] = []
 
@@ -82,6 +92,6 @@ def upload_certificate(config: AppConfig, cert_name: str, pfx_data: bytes) -> No
     Exceptions propagate to the caller — the orchestrator's retry policy
     (Stage 5) handles transient failures like permission errors or throttling.
     """
-    client = CertificateClient(config.keyvault_url, DefaultAzureCredential())
+    client = CertificateClient(config.keyvault_url, _get_credential())
     client.import_certificate(certificate_name=cert_name, certificate_bytes=pfx_data)
     logger.info("Uploaded certificate '%s'", cert_name)

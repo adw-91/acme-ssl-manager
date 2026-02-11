@@ -308,6 +308,24 @@ def test_upload_certificate_calls_import(mock_cred, mock_client_cls):
     mock_client.import_certificate.assert_called_once_with(certificate_name="my-cert", certificate_bytes=pfx_data)
 
 
+@patch("cert_manager.keyvault.CertificateClient")
+@patch("cert_manager.keyvault.DefaultAzureCredential")
+def test_scan_and_upload_share_credential_within_module(mock_cred, mock_client_cls):
+    """DefaultAzureCredential should be created once per module, not per call."""
+    from cert_manager.keyvault import scan_certificates, upload_certificate
+
+    config = _make_config(renewal_window_days=30)
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.list_properties_of_certificates.return_value = []
+
+    scan_certificates(config)
+    upload_certificate(config, "cert", b"\x00")
+
+    # Credential should be instantiated once (module-level), not per function call
+    assert mock_cred.call_count == 1
+
+
 # --- _extract_cn tests ---
 
 
