@@ -52,7 +52,7 @@ ruff format .
 - `dns/base.py` — `DnsProvider` ABC with `create_txt_record` / `delete_txt_record`
 - `dns/azure_dns.py` — Azure DNS implementation (`azure-mgmt-dns`)
 - `dns/cloudflare.py` — Cloudflare REST API implementation
-- `models.py` — data classes (`CertificateInfo`, `RenewalRequest`, `RenewalResult`) passed between activity functions
+- `models.py` — data classes (`CertificateInfo`, `RenewalRequest`, `RenewalResult`, `DnsChallengeInfo`, `AcmeOrderContext`) passed between activity functions
 
 **IaC**: `deploy/main.bicep` — Function App, Storage Account, Key Vault, RBAC assignments.
 
@@ -68,7 +68,7 @@ ruff format .
 
 Required env vars: `AZURE_KEYVAULT_URL`, `DNS_PROVIDER`, `ACME_CONTACT_EMAIL`
 
-Optional: `ACME_DIRECTORY_URL` (defaults to Let's Encrypt), `RENEWAL_WINDOW_DAYS` (default 3), `CLOUDFLARE_API_TOKEN`
+Optional: `ACME_DIRECTORY_URL` (defaults to Let's Encrypt), `RENEWAL_WINDOW_DAYS` (default 3), `CLOUDFLARE_API_TOKEN`, `ACME_ACCOUNT_KEY` (JWK JSON — reuse existing ACME account), `ACME_ACCOUNT_URI` (account URL — must be set with `ACME_ACCOUNT_KEY`)
 
 ## Certificate Tags
 
@@ -78,12 +78,16 @@ Optional: `ACME_DIRECTORY_URL` (defaults to Let's Encrypt), `RENEWAL_WINDOW_DAYS
 | `acme-dns-provider` | No | Override default DNS provider |
 | `acme-ca` | No | Override default ACME CA |
 
+## Known Issues (from code review of stages 1-3)
+
+No outstanding issues — all 7 findings from the stages 1-3 review have been resolved.
+
 ## Implementation Stages
 
 Development follows staged milestones defined in `docs/PROJECT_PLAN.md`:
 1. ~~Project scaffolding & core models~~ (complete)
-2. Key Vault integration
-3. ACME client
+2. ~~Key Vault integration~~ (complete)
+3. ~~ACME client~~ (complete)
 4. DNS providers
 5. Orchestrator & wiring
 6. Blob onboarding
