@@ -269,6 +269,50 @@ def test_create_order_wildcard_strips_star_prefix(mock_crypto_util, mock_build_c
     assert ctx.challenges[0].record_name == "_acme-challenge.example.com"
 
 
+@patch("cert_manager.acme_client._deserialize_key")
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client.crypto_util")
+def test_create_order_reuses_existing_account(mock_crypto_util, mock_build_client, mock_deser_key):
+    """When account_key_json + account_uri provided, reuse account without registration."""
+    from cert_manager.acme_client import create_order
+
+    mock_key = MagicMock(spec=josepy.JWKRSA)
+    mock_deser_key.return_value = mock_key
+
+    mock_client = MagicMock()
+    mock_build_client.return_value = mock_client
+
+    mock_crypto_util.make_csr.return_value = b"fake-csr-pem"
+
+    chall, _, val = _make_mock_dns01_challenge("example.com", "val1")
+    authz = _make_mock_authz("example.com", chall)
+    mock_order = MagicMock()
+    mock_order.uri = "https://acme.example.com/order/789"
+    mock_order.authorizations = [authz]
+    mock_client.new_order.return_value = mock_order
+
+    existing_key_json = '{"kty": "RSA", "n": "abc", "e": "AQAB"}'
+    existing_uri = "https://acme.example.com/acct/existing"
+
+    ctx = create_order(
+        directory_url="https://acme.example.com/directory",
+        contact_email="admin@example.com",
+        domains=["example.com"],
+        account_key_json=existing_key_json,
+        account_uri=existing_uri,
+    )
+
+    # Should deserialize key, NOT generate new one
+    mock_deser_key.assert_called_once_with(existing_key_json)
+    # Should build client with account_uri
+    mock_build_client.assert_called_once_with("https://acme.example.com/directory", mock_key, account_uri=existing_uri)
+    # Should NOT call new_account
+    mock_client.new_account.assert_not_called()
+    # Should preserve the existing account info
+    assert ctx.account_uri == existing_uri
+    assert ctx.account_key_json == existing_key_json
+
+
 # --- build_pfx / complete_order tests ---
 
 
