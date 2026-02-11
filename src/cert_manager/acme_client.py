@@ -105,6 +105,9 @@ def create_order(
     Returns an AcmeOrderContext with all state needed to finalize the order
     after DNS records have been provisioned.
     """
+    if bool(account_key_json) != bool(account_uri):
+        raise ValueError("ACME_ACCOUNT_KEY and ACME_ACCOUNT_URI must both be set or both be unset")
+
     if account_key_json and account_uri:
         account_key = _deserialize_key(account_key_json)
         client = _build_client(directory_url, account_key, account_uri=account_uri)

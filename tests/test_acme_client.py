@@ -269,6 +269,42 @@ def test_create_order_wildcard_strips_star_prefix(mock_crypto_util, mock_build_c
     assert ctx.challenges[0].record_name == "_acme-challenge.example.com"
 
 
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client.crypto_util")
+def test_create_order_raises_when_account_key_without_uri(mock_crypto_util, mock_build_client):
+    """Providing account_key_json without account_uri should raise ValueError."""
+    import pytest
+
+    from cert_manager.acme_client import create_order
+
+    with pytest.raises(ValueError, match="ACME_ACCOUNT_KEY.*ACME_ACCOUNT_URI"):
+        create_order(
+            directory_url="https://acme.example.com/directory",
+            contact_email="admin@example.com",
+            domains=["example.com"],
+            account_key_json='{"kty": "RSA", "n": "abc", "e": "AQAB"}',
+            account_uri=None,
+        )
+
+
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client.crypto_util")
+def test_create_order_raises_when_account_uri_without_key(mock_crypto_util, mock_build_client):
+    """Providing account_uri without account_key_json should raise ValueError."""
+    import pytest
+
+    from cert_manager.acme_client import create_order
+
+    with pytest.raises(ValueError, match="ACME_ACCOUNT_KEY.*ACME_ACCOUNT_URI"):
+        create_order(
+            directory_url="https://acme.example.com/directory",
+            contact_email="admin@example.com",
+            domains=["example.com"],
+            account_key_json=None,
+            account_uri="https://acme.example.com/acct/123",
+        )
+
+
 @patch("cert_manager.acme_client._deserialize_key")
 @patch("cert_manager.acme_client._build_client")
 @patch("cert_manager.acme_client.crypto_util")
