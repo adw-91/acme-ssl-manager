@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 
 import josepy
 from acme import challenges, crypto_util, messages
 from acme.client import ClientNetwork, ClientV2
+from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
 
 from cert_manager.models import AcmeOrderContext, DnsChallengeInfo
 
@@ -131,3 +134,96 @@ def create_order(
         private_key_pem=private_key_pem.decode() if isinstance(private_key_pem, bytes) else private_key_pem,
         challenges=tuple(challenge_infos),
     )
+
+
+def build_pfx(fullchain_pem: bytes | str, private_key_pem: bytes | str) -> bytes:
+    """Assemble a PFX (PKCS#12) archive from fullchain PEM and private key PEM.
+
+    The fullchain PEM should contain the end-entity certificate first,
+    followed by any intermediate certificates.
+    """
+    if isinstance(fullchain_pem, str):
+        fullchain_pem = fullchain_pem.encode()
+    if isinstance(private_key_pem, str):
+        private_key_pem = private_key_pem.encode()
+
+    certs = x509.load_pem_x509_certificates(fullchain_pem)
+    private_key = serialization.load_pem_private_key(private_key_pem, password=None)
+
+    end_entity = certs[0]
+    intermediates = certs[1:] or None
+
+    return pkcs12.serialize_key_and_certificates(
+        name=None,
+        key=private_key,
+        cert=end_entity,
+        cas=intermediates,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+
+def _fetch_order(
+    client: ClientV2,
+    order_url: str,
+    csr_pem: bytes,
+) -> messages.OrderResource:
+    """Reconstruct an OrderResource by fetching the order and its authorizations.
+
+    The ACME server is the source of truth — we refetch the order body
+    and each authorization rather than trying to serialize them between activities.
+
+    Uses ``client.net.post`` for POST-as-GET (JWS-signed empty payload per RFC 8555).
+    """
+    # POST-as-GET to fetch order body
+    order_response = client.net.post(order_url, None)
+    order_body = messages.Order.from_json(order_response.json())
+
+    # Fetch each authorization
+    authzrs = []
+    for auth_url in order_body.authorizations:
+        auth_response = client.net.post(auth_url, None)
+        authz_body = messages.Authorization.from_json(auth_response.json())
+        authzrs.append(messages.AuthorizationResource(body=authz_body, uri=auth_url))
+
+    return messages.OrderResource(
+        body=order_body,
+        uri=order_url,
+        authorizations=authzrs,
+        csr_pem=csr_pem,
+    )
+
+
+def complete_order(order_context: AcmeOrderContext, deadline_seconds: int = 180) -> bytes:
+    """Answer DNS-01 challenges, poll for validation, finalize order, and build PFX.
+
+    Call this after DNS TXT records have been provisioned for all challenges
+    returned by create_order.
+    """
+    account_key = _deserialize_key(order_context.account_key_json)
+    client = _build_client(
+        order_context.directory_url,
+        account_key,
+        account_uri=order_context.account_uri,
+    )
+
+    csr_pem = order_context.csr_pem.encode() if isinstance(order_context.csr_pem, str) else order_context.csr_pem
+    order = _fetch_order(client, order_context.order_url, csr_pem)
+
+    # Answer all DNS-01 challenges
+    for authz in order.authorizations:
+        domain = authz.body.identifier.value
+        for challb in authz.body.challenges:
+            if isinstance(challb.chall, challenges.DNS01):
+                response, _validation = challb.response_and_validation(account_key)
+                client.answer_challenge(challb, response)
+                logger.info("Answered DNS-01 challenge for %s", domain)
+                break
+        else:
+            raise ValueError(f"No DNS-01 challenge found for domain {domain}")
+
+    # Poll for authorization + finalize
+    deadline = datetime.now(UTC) + timedelta(seconds=deadline_seconds)
+    finalized = client.poll_and_finalize(order, deadline)
+    logger.info("Order finalized: %s", order.uri)
+
+    return build_pfx(finalized.fullchain_pem, order_context.private_key_pem)

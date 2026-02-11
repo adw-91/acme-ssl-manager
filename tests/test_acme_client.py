@@ -1,10 +1,15 @@
 """Tests for cert_manager.acme_client."""
 
+import datetime
 import json
 from unittest.mock import MagicMock, patch
 
 import josepy
 from acme import challenges
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
 
 from cert_manager.models import AcmeOrderContext
 
@@ -261,3 +266,111 @@ def test_create_order_wildcard_strips_star_prefix(mock_crypto_util, mock_build_c
     assert len(ctx.challenges) == 1
     assert ctx.challenges[0].domain == "*.example.com"
     assert ctx.challenges[0].record_name == "_acme-challenge.example.com"
+
+
+# --- build_pfx / complete_order tests ---
+
+
+def _make_self_signed_cert_and_key():
+    """Generate a self-signed cert + private key for testing PFX assembly."""
+    from cryptography.hazmat.primitives.asymmetric import rsa as rsa_mod
+
+    key = rsa_mod.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "example.com")])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.now(datetime.UTC))
+        .not_valid_after(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=90))
+        .sign(key, hashes.SHA256())
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    return cert_pem, key_pem
+
+
+def test_build_pfx_produces_valid_pkcs12():
+    from cert_manager.acme_client import build_pfx
+
+    cert_pem, key_pem = _make_self_signed_cert_and_key()
+    pfx_bytes = build_pfx(cert_pem, key_pem)
+
+    # Verify we can parse the PFX back
+    private_key, certificate, chain = pkcs12.load_key_and_certificates(pfx_bytes, None)
+    assert private_key is not None
+    assert certificate is not None
+    assert certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == "example.com"
+
+
+def test_build_pfx_with_chain():
+    """Fullchain PEM with end-entity + intermediate should include both."""
+    from cert_manager.acme_client import build_pfx
+
+    cert_pem, key_pem = _make_self_signed_cert_and_key()
+    intermediate_pem, _ = _make_self_signed_cert_and_key()  # fake intermediate
+    fullchain_pem = cert_pem + intermediate_pem
+
+    pfx_bytes = build_pfx(fullchain_pem, key_pem)
+
+    private_key, certificate, chain = pkcs12.load_key_and_certificates(pfx_bytes, None)
+    assert private_key is not None
+    assert certificate is not None
+    assert chain is not None
+    assert len(chain) == 1
+
+
+@patch("cert_manager.acme_client._build_client")
+@patch("cert_manager.acme_client._deserialize_key")
+def test_complete_order_answers_challenges_and_returns_pfx(mock_deser_key, mock_build_client):
+    from cert_manager.acme_client import complete_order
+
+    mock_key = MagicMock(spec=josepy.JWKRSA)
+    mock_deser_key.return_value = mock_key
+
+    mock_client = MagicMock()
+    mock_build_client.return_value = mock_client
+
+    # Setup challenge in authorization
+    dns_chall = MagicMock()
+    dns_chall.chall = MagicMock(spec=challenges.DNS01)
+    response = MagicMock()
+    dns_chall.response_and_validation.return_value = (response, "token")
+
+    authz = MagicMock()
+    authz.body.challenges = (dns_chall,)
+
+    # Setup order refetch
+    mock_order = MagicMock()
+    mock_order.authorizations = [authz]
+
+    # poll_and_finalize returns order with fullchain
+    cert_pem, key_pem = _make_self_signed_cert_and_key()
+    finalized_order = MagicMock()
+    finalized_order.fullchain_pem = cert_pem.decode()
+    mock_client.poll_and_finalize.return_value = finalized_order
+
+    # Patch _fetch_order to return our mock order
+    with patch("cert_manager.acme_client._fetch_order", return_value=mock_order):
+        ctx = AcmeOrderContext(
+            account_key_json='{"kty": "RSA"}',
+            account_uri="https://acme.example.com/acct/123",
+            directory_url="https://acme.example.com/directory",
+            order_url="https://acme.example.com/order/456",
+            csr_pem="fake-csr",
+            private_key_pem=key_pem.decode(),
+            challenges=(),
+        )
+
+        pfx_bytes = complete_order(ctx)
+
+    assert isinstance(pfx_bytes, bytes)
+    assert len(pfx_bytes) > 0
+    mock_client.answer_challenge.assert_called_once_with(dns_chall, response)
+    mock_client.poll_and_finalize.assert_called_once()
