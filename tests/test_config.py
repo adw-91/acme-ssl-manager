@@ -111,3 +111,30 @@ def test_load_config_negative_renewal_window(monkeypatch):
 
     with pytest.raises(ValueError, match="RENEWAL_WINDOW_DAYS must be a positive integer"):
         load_config()
+
+
+def test_load_config_azure_dns_fields(monkeypatch):
+    from cert_manager.config import load_config
+
+    monkeypatch.setenv("AZURE_KEYVAULT_URL", "https://myvault.vault.azure.net")
+    monkeypatch.setenv("DNS_PROVIDER", "azure")
+    monkeypatch.setenv("ACME_CONTACT_EMAIL", "admin@example.com")
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "sub-123")
+    monkeypatch.setenv("AZURE_DNS_RESOURCE_GROUP", "rg-dns")
+
+    cfg = load_config()
+    assert cfg.azure_subscription_id == "sub-123"
+    assert cfg.azure_dns_resource_group == "rg-dns"
+
+
+def test_load_config_azure_dns_fields_default_none(monkeypatch):
+    from cert_manager.config import load_config
+
+    monkeypatch.setenv("AZURE_KEYVAULT_URL", "https://myvault.vault.azure.net")
+    monkeypatch.setenv("DNS_PROVIDER", "cloudflare")
+    monkeypatch.setenv("ACME_CONTACT_EMAIL", "admin@example.com")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-tok")
+
+    cfg = load_config()
+    assert cfg.azure_subscription_id is None
+    assert cfg.azure_dns_resource_group is None

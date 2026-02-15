@@ -19,6 +19,8 @@ class AppConfig:
     acme_directory_url: str = _LETS_ENCRYPT_DIRECTORY
     renewal_window_days: int = _DEFAULT_RENEWAL_WINDOW_DAYS
     cloudflare_api_token: str | None = None
+    azure_subscription_id: str | None = None
+    azure_dns_resource_group: str | None = None
 
 
 def _require_env(name: str) -> str:
@@ -44,6 +46,8 @@ def load_config() -> AppConfig:
         raise ValueError(f"RENEWAL_WINDOW_DAYS must be a positive integer, got: {renewal_window_days}")
 
     cloudflare_api_token = os.environ.get("CLOUDFLARE_API_TOKEN")
+    azure_subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
+    azure_dns_resource_group = os.environ.get("AZURE_DNS_RESOURCE_GROUP")
 
     return AppConfig(
         keyvault_url=keyvault_url,
@@ -52,4 +56,6 @@ def load_config() -> AppConfig:
         acme_directory_url=acme_directory_url,
         renewal_window_days=renewal_window_days,
         cloudflare_api_token=cloudflare_api_token,
+        azure_subscription_id=azure_subscription_id,
+        azure_dns_resource_group=azure_dns_resource_group,
     )
