@@ -45,6 +45,7 @@ ruff format .
 - Blob trigger on `/certs` container handles certificate onboarding (PFX/PEM import)
 
 **Core library** (`src/cert_manager/`):
+- `auth.py` — shared cached `DefaultAzureCredential`
 - `config.py` — env var loading and validation
 - `keyvault.py` — scan certs by tag, upload PFX
 - `acme_client.py` — ACME account registration, order creation, challenge handling, cert download (uses certbot `acme` library)
@@ -52,6 +53,8 @@ ruff format .
 - `dns/base.py` — `DnsProvider` ABC with `create_txt_record` / `delete_txt_record`
 - `dns/azure_dns.py` — Azure DNS implementation (`azure-mgmt-dns`)
 - `dns/cloudflare.py` — Cloudflare REST API implementation
+- `dns/util.py` — zone extraction helper (`split_record_name`)
+- `dns/__init__.py` — provider factory (`get_dns_provider`)
 - `models.py` — data classes (`CertificateInfo`, `RenewalRequest`, `RenewalResult`, `DnsChallengeInfo`, `AcmeOrderContext`) passed between activity functions
 
 **IaC**: `deploy/main.bicep` — Function App, Storage Account, Key Vault, RBAC assignments.
@@ -68,7 +71,7 @@ ruff format .
 
 Required env vars: `AZURE_KEYVAULT_URL`, `DNS_PROVIDER`, `ACME_CONTACT_EMAIL`
 
-Optional: `ACME_DIRECTORY_URL` (defaults to Let's Encrypt), `RENEWAL_WINDOW_DAYS` (default 3), `CLOUDFLARE_API_TOKEN`, `ACME_ACCOUNT_KEY` (JWK JSON — reuse existing ACME account), `ACME_ACCOUNT_URI` (account URL — must be set with `ACME_ACCOUNT_KEY`)
+Optional: `ACME_DIRECTORY_URL` (defaults to Let's Encrypt), `RENEWAL_WINDOW_DAYS` (default 3), `CLOUDFLARE_API_TOKEN`, `ACME_ACCOUNT_KEY` (JWK JSON — reuse existing ACME account), `ACME_ACCOUNT_URI` (account URL — must be set with `ACME_ACCOUNT_KEY`), `AZURE_SUBSCRIPTION_ID` (required if DNS_PROVIDER=azure), `AZURE_DNS_RESOURCE_GROUP` (required if DNS_PROVIDER=azure)
 
 ## Certificate Tags
 
@@ -88,7 +91,7 @@ Development follows staged milestones defined in `docs/PROJECT_PLAN.md`:
 1. ~~Project scaffolding & core models~~ (complete)
 2. ~~Key Vault integration~~ (complete)
 3. ~~ACME client~~ (complete)
-4. DNS providers
+4. ~~DNS providers~~ (complete)
 5. Orchestrator & wiring
 6. Blob onboarding
 7. IaC & deployment
