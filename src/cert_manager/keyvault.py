@@ -6,23 +6,13 @@ import logging
 import re
 from datetime import UTC, datetime, timedelta
 
-from azure.identity import DefaultAzureCredential
 from azure.keyvault.certificates import CertificateClient
 
+from cert_manager.auth import get_credential as _get_credential
 from cert_manager.config import AppConfig
 from cert_manager.models import CertificateInfo
 
 logger = logging.getLogger(__name__)
-
-_credential: DefaultAzureCredential | None = None
-
-
-def _get_credential() -> DefaultAzureCredential:
-    """Return a cached DefaultAzureCredential instance."""
-    global _credential
-    if _credential is None:
-        _credential = DefaultAzureCredential()
-    return _credential
 
 
 def _extract_cn(subject: str | None) -> str | None:

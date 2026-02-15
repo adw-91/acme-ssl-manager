@@ -42,7 +42,7 @@ def _make_kv_certificate(name, san_dns_names=None, subject=None, tags=None, expi
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_filters_by_acme_managed_tag(mock_cred, mock_client_cls):
     from cert_manager.keyvault import scan_certificates
 
@@ -71,7 +71,7 @@ def test_scan_filters_by_acme_managed_tag(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_no_managed_certs_returns_empty(mock_cred, mock_client_cls):
     from cert_manager.keyvault import scan_certificates
 
@@ -91,7 +91,7 @@ def test_scan_no_managed_certs_returns_empty(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_filters_by_renewal_window(mock_cred, mock_client_cls):
     from cert_manager.keyvault import scan_certificates
 
@@ -120,7 +120,7 @@ def test_scan_filters_by_renewal_window(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_extracts_domains_from_sans(mock_cred, mock_client_cls):
     from cert_manager.keyvault import scan_certificates
 
@@ -146,7 +146,7 @@ def test_scan_extracts_domains_from_sans(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_falls_back_to_cn_when_no_sans(mock_cred, mock_client_cls):
     from cert_manager.keyvault import scan_certificates
 
@@ -173,7 +173,7 @@ def test_scan_falls_back_to_cn_when_no_sans(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_falls_back_to_cn_when_sans_empty_list(mock_cred, mock_client_cls):
     """Empty list (not None) for san_dns_names should also fall back to CN."""
     from cert_manager.keyvault import scan_certificates
@@ -201,7 +201,7 @@ def test_scan_falls_back_to_cn_when_sans_empty_list(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_includes_cert_with_no_expiry(mock_cred, mock_client_cls, caplog):
     """A managed cert with expires_on=None is abnormal — include it and warn."""
     from cert_manager.keyvault import scan_certificates
@@ -231,7 +231,7 @@ def test_scan_includes_cert_with_no_expiry(mock_cred, mock_client_cls, caplog):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_skips_cert_with_no_extractable_domains(mock_cred, mock_client_cls, caplog):
     """A cert with no SANs and no CN can't be renewed — skip it, log warning."""
     from cert_manager.keyvault import scan_certificates
@@ -260,7 +260,7 @@ def test_scan_skips_cert_with_no_extractable_domains(mock_cred, mock_client_cls,
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_returns_serializable_dicts(mock_cred, mock_client_cls):
     """Verify scan output round-trips through CertificateInfo.from_dict()."""
     from cert_manager.keyvault import scan_certificates
@@ -293,7 +293,7 @@ def test_scan_returns_serializable_dicts(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_upload_certificate_calls_import(mock_cred, mock_client_cls):
     from cert_manager.keyvault import upload_certificate
 
@@ -309,7 +309,7 @@ def test_upload_certificate_calls_import(mock_cred, mock_client_cls):
 
 
 @patch("cert_manager.keyvault.CertificateClient")
-@patch("cert_manager.keyvault.DefaultAzureCredential")
+@patch("cert_manager.auth.DefaultAzureCredential")
 def test_scan_and_upload_share_credential_within_module(mock_cred, mock_client_cls):
     """DefaultAzureCredential should be created once per module, not per call."""
     from cert_manager.keyvault import scan_certificates, upload_certificate
