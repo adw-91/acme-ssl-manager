@@ -9,6 +9,8 @@ import azure.functions as func
 
 from cert_manager.acme_client import complete_order, create_order
 from cert_manager.config import load_config
+from cert_manager.dns import get_dns_provider
+from cert_manager.dns.util import split_record_name
 from cert_manager.keyvault import scan_certificates, upload_certificate
 from cert_manager.models import AcmeOrderContext, RenewalRequest
 
@@ -69,3 +71,23 @@ def finalize_acme_order(input: dict) -> dict:
         "cert_name": input["cert_name"],
         "pfx_b64": b64encode(pfx_bytes).decode(),
     }
+
+
+# Activity — create DNS TXT record for ACME challenge
+@app.activity_trigger(input_name="input")
+def create_dns_txt_record(input: dict) -> None:
+
+    config = load_config()
+    provider = get_dns_provider(config, provider_name=input["dns_provider"])
+    zone, relative = split_record_name(input["record_name"], input["domain"])
+    provider.create_txt_record(zone, relative, input["record_value"])
+
+
+# Activity — delete DNS TXT record after ACME validation
+@app.activity_trigger(input_name="input")
+def delete_dns_txt_record(input: dict) -> None:
+
+    config = load_config()
+    provider = get_dns_provider(config, provider_name=input["dns_provider"])
+    zone, relative = split_record_name(input["record_name"], input["domain"])
+    provider.delete_txt_record(zone, relative)
