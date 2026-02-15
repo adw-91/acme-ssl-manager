@@ -10,7 +10,8 @@ class TestCreateDnsTxtRecordActivity:
         from function_app import create_dns_txt_record
 
         mock_provider = MagicMock()
-        mock_get_provider.return_value = mock_provider
+        mock_get_provider.return_value.__enter__ = MagicMock(return_value=mock_provider)
+        mock_get_provider.return_value.__exit__ = MagicMock(return_value=False)
 
         input_data = {
             "dns_provider": "azure",
@@ -30,7 +31,8 @@ class TestCreateDnsTxtRecordActivity:
         from function_app import create_dns_txt_record
 
         mock_provider = MagicMock()
-        mock_get_provider.return_value = mock_provider
+        mock_get_provider.return_value.__enter__ = MagicMock(return_value=mock_provider)
+        mock_get_provider.return_value.__exit__ = MagicMock(return_value=False)
 
         input_data = {
             "dns_provider": "cloudflare",
@@ -51,7 +53,8 @@ class TestDeleteDnsTxtRecordActivity:
         from function_app import delete_dns_txt_record
 
         mock_provider = MagicMock()
-        mock_get_provider.return_value = mock_provider
+        mock_get_provider.return_value.__enter__ = MagicMock(return_value=mock_provider)
+        mock_get_provider.return_value.__exit__ = MagicMock(return_value=False)
 
         input_data = {
             "dns_provider": "azure",
